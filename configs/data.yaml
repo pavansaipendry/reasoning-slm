@@ -51,7 +51,7 @@ tokenizer:
   model: bpe                 # byte-level BPE
   sample_docs: 50000         # docs sampled (post-filter) to train the tokenizer
   special_tokens: ["<|endoftext|>", "<|pad|>"]
-  out: data/build/tokenizer.json
+  out: null                  # null -> save to <out_dir>/tokenizer.json (keeps each build self-contained)
 
 pack:
   dtype: uint16              # vocab < 65536 -> uint16 is enough
