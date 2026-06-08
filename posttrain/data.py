@@ -33,31 +33,40 @@ class RLPrompt:
 
 
 # ---------------- synthetic arithmetic (offline, verifiable) ----------------
-def arithmetic_examples(n: int, seed: int = 0, max_val: int = 99, ops=("+",)):
-    """Yield n arithmetic problems with chain-of-thought + gold answer.
+def _spaced(x) -> str:
+    """Render an integer digit-by-digit ('110' -> '1 1 0') so each digit is its own
+    token. Without this, BPE fuses multi-digit numbers into opaque tokens and a small
+    model can't even copy the operands, let alone add them."""
+    return " ".join(str(x))
 
-    Defaults to addition only with 2-digit operands: hard enough that a small BPE
-    model is partially correct after SFT (so GRPO has a reward signal to climb),
-    but tractable (unlike multiplication, which is hopeless at this scale)."""
+
+def arithmetic_examples(n: int, seed: int = 0, max_val: int = 99, ops=("+",)):
+    """Yield n arithmetic problems as (question, cot, target_answer, gold).
+
+    Numbers are digit-spaced in the text the model reads/writes; `gold` is the plain
+    integer string used by the verifiable reward (the reward strips the spaces back).
+    Defaults to addition only with 2-digit operands: tractable for a small model after
+    SFT, but not solved — so GRPO has a reward signal to climb."""
     rng = random.Random(seed)
     out = []
     for _ in range(n):
         a, b = rng.randint(2, max_val), rng.randint(2, max_val)
         op = rng.choice(list(ops))
         ans = a + b if op == "+" else (a - b if op == "-" else a * b)
-        q = f"What is {a} {op} {b}?"
-        cot = f"We compute {a} {op} {b} = {ans}."
-        out.append((q, cot, str(ans)))
+        sa, sb, sans = _spaced(a), _spaced(b), _spaced(ans)
+        q = f"What is {sa} {op} {sb}?"
+        cot = f"We compute {sa} {op} {sb} = {sans}."
+        out.append((q, cot, sans, str(ans)))
     return out
 
 
 def arithmetic_sft(n: int, seed: int = 0):
-    return [SFTExample(build_prompt(q), build_target(cot, ans))
-            for q, cot, ans in arithmetic_examples(n, seed)]
+    return [SFTExample(build_prompt(q), build_target(cot, target))
+            for q, cot, target, _ in arithmetic_examples(n, seed)]
 
 
 def arithmetic_rl(n: int, seed: int = 0):
-    return [RLPrompt(build_prompt(q), ans) for q, _, ans in arithmetic_examples(n, seed)]
+    return [RLPrompt(build_prompt(q), gold) for q, _, _, gold in arithmetic_examples(n, seed)]
 
 
 # ---------------- GSM8K (real) ----------------

@@ -25,7 +25,9 @@ def extract_answer(text: str) -> str | None:
 def _to_number(s: str):
     if s is None:
         return None
-    m = _NUM_RE.search(s.replace(",", ""))
+    # strip thousands separators AND inter-digit spaces ("1 1 0" -> "110" for the
+    # digit-tokenized arithmetic representation)
+    m = _NUM_RE.search(s.replace(",", "").replace(" ", ""))
     if not m:
         return None
     try:
