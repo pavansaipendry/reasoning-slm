@@ -33,13 +33,18 @@ inference engine) I wrote myself.
   destroy A100 pods, SSH key injection, repo sync, remote launch) and debugged a real
   **CUDA driver/container-image incompatibility**.
 
-## Bullets that become defensible AFTER the runs in flight finish
-- Pretrained the model on a **~1B-token corpus** to a base val-loss of `<X>` (run in progress).
-- Post-trained with **SFT + GRPO (implemented from scratch) using verifiable rewards**
-  (numeric-answer and code-execution checks), improving GSM8K/HumanEval-subset from
-  `<base>` → `<final>` (planned).
-- Served the model on a **from-scratch inference engine** (PagedAttention + custom Triton
-  kernel) with an OpenAI-compatible API at `<N>` tokens/sec (planned).
+## Post-training bullets — now defensible with real numbers
+- Pretrained a 118M gated-attention model on an **841M-token** corpus to **validation
+  loss 4.40** (from 10.5) at ~33% MFU on a single A100.
+- **Implemented GRPO (Group Relative Policy Optimization) from scratch** — group-relative
+  advantages, PPO-clipped objective, KL-to-reference, no value network — and used it with
+  **verifiable rewards** to lift a reasoning task's accuracy from **35.7% (SFT) to 91.0%**
+  (held-out, +55 points) with a stable, bounded-KL learning curve.
+- Diagnosed and fixed a **BPE-tokenization failure mode** (multi-digit numbers fuse into
+  opaque tokens, blocking arithmetic) via digit-level number representation, raising SFT
+  accuracy 5% → 35.7% before RL.
+- (Planned) Serve the final model on a from-scratch inference engine (PagedAttention +
+  Triton) with an OpenAI-compatible API.
 
 ---
 
@@ -70,16 +75,17 @@ inference engine) I wrote myself.
 
 ---
 
-## Measured results so far
+## Measured results
 | Metric | Value |
 |--------|-------|
-| Corpus (validation build) | 189.4M tokens, 109k docs (from 120k streamed) |
-| Quality-filter reject rate | 6.7% (8,030 / 120,000) |
-| Near-dups removed (MinHash) | 2,683 |
+| Corpus | 841M tokens, 431k docs (from 500k streamed) |
+| Quality-filter reject rate | 8.2% (40,959 / 500,000) |
+| Near-dups removed (MinHash) | 28,014 |
 | Model | 118.2M params, gated attention, 2048 ctx |
-| Throughput | ~146k tokens/sec, single A100 80GB |
-| MFU | ~33% |
-| Convergence (400-step val run) | val loss 10.53 → 7.36 |
+| Throughput / MFU | ~145k tokens/sec, ~33% MFU (single A100 80GB) |
+| Pretrain convergence | val loss 10.53 → **4.40** (3,200 steps) |
+| SFT accuracy (2-digit addition, held-out) | **35.7%** (format 99%) |
+| **GRPO accuracy (same task)** | **91.0%** (format 100%) — +55 pts over SFT |
 
 ---
 
