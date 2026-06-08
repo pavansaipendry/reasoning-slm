@@ -40,7 +40,7 @@ def build_target(cot: str, answer: str) -> str:
 def load_model(ckpt_path: str, device: str | None = None):
     """Load a ReasoningLM from a checkpoint saved by pretrain/train.py or sft.py."""
     device = device or get_device()
-    ckpt = torch.load(ckpt_path, map_location=device)
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     mcfg_d = ckpt["config"]
     model = ReasoningLM(ModelConfig(**mcfg_d)).to(device)
     model.load_state_dict(ckpt["model"])
