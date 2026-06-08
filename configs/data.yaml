@@ -10,10 +10,9 @@ sources:
     text_key: text
     weight: 0.45
     max_docs: 200000
-  - name: the-stack-python
-    hf_path: bigcode/the-stack-dedup
-    hf_config: null            # use data_dir filtering instead (permissive licenses)
-    data_dir: data/python
+  - name: codeparrot-python
+    hf_path: codeparrot/codeparrot-clean   # open/parquet (the-stack is gated on HF)
+    hf_config: null
     split: train
     text_key: content
     kind: code
