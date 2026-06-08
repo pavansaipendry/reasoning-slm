@@ -1,0 +1,61 @@
+# Data pipeline configuration (Act I).
+# Consumed by `python -m data.pipeline --config configs/data.yaml`.
+
+# Source mixture. `weight` is the target fraction of *kept* tokens; `max_docs`
+# caps how many raw docs we stream (keep small for a first cost-conscious run).
+sources:
+  - name: open-web-math
+    hf_path: open-web-math/open-web-math
+    split: train
+    text_key: text
+    weight: 0.45
+    max_docs: 200000
+  - name: the-stack-python
+    hf_path: bigcode/the-stack-dedup
+    hf_config: null            # use data_dir filtering instead (permissive licenses)
+    data_dir: data/python
+    split: train
+    text_key: content
+    kind: code
+    weight: 0.40
+    max_docs: 200000
+  - name: fineweb-edu
+    hf_path: HuggingFaceFW/fineweb-edu
+    hf_config: sample-10BT
+    split: train
+    text_key: text
+    weight: 0.15
+    max_docs: 100000
+
+filters:
+  min_chars: 200
+  max_chars: 100000
+  min_mean_word_len: 3.0
+  max_mean_word_len: 10.0
+  max_symbol_to_word_ratio: 0.10     # '#' and '...' heavy junk
+  min_alpha_fraction: 0.60           # prose only; code uses the code ruleset
+  max_dup_line_fraction: 0.30
+  # code-specific
+  code_max_mean_line_len: 200
+  code_min_alnum_fraction: 0.40
+
+dedup:
+  enabled: true
+  method: minhash            # minhash | exact | none
+  num_perm: 128
+  jaccard_threshold: 0.8     # docs >= this similarity are treated as duplicates
+  shingle_size: 5            # word n-gram shingles
+
+tokenizer:
+  train: true
+  vocab_size: 32000
+  model: bpe                 # byte-level BPE
+  sample_docs: 50000         # docs sampled (post-filter) to train the tokenizer
+  special_tokens: ["<|endoftext|>", "<|pad|>"]
+  out: data/build/tokenizer.json
+
+pack:
+  dtype: uint16              # vocab < 65536 -> uint16 is enough
+  shard_size_tokens: 100000000   # 100M tokens per shard
+  eot_token: "<|endoftext|>"
+  val_fraction: 0.0005

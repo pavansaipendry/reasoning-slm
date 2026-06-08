@@ -1,0 +1,20 @@
+# --- core ---
+numpy>=1.26
+tqdm>=4.66
+pyyaml>=6.0
+regex>=2024.0
+
+# --- data pipeline (Act I) ---
+datasets>=2.19          # streaming corpora from HuggingFace
+tokenizers>=0.19        # train the 32k BPE tokenizer
+zstandard>=0.22         # read/write compressed cleaned-corpus shards
+# MinHash + LSH near-dedup is hand-rolled in NumPy (data/dedup.py) — no datasketch dep
+
+# --- training (Act I/II) ---
+torch>=2.2
+
+# --- post-training (Act II), optional until that stage ---
+# trl>=0.9              # reference GRPO; we implement our own in posttrain/grpo.py
+
+# --- eval (Act III), optional until that stage ---
+# lm-eval>=0.4

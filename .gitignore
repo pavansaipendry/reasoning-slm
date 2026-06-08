@@ -1,0 +1,26 @@
+# data artifacts
+data/build/
+data/build_sample/
+*.bin
+*.idx
+*.arrow
+tokenizer.json.bak
+
+# checkpoints / logs
+checkpoints/
+runs/
+wandb/
+*.pt
+*.ckpt
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,29 @@
+# ~100M-param decoder pretrain config (Act I). Stub — wired up in the pretrain stage.
+model:
+  vocab_size: 32000
+  block_size: 2048
+  n_layer: 12
+  n_head: 12
+  n_embd: 768
+  dropout: 0.0
+  bias: false
+  attention: gated        # vanilla | gated | nsa
+
+data:
+  dir: data/build
+  train_bin: train.bin
+  val_bin: val.bin
+
+optim:
+  batch_tokens: 262144    # ~256k tokens/step via grad accumulation
+  micro_batch: 16
+  lr: 3.0e-4
+  min_lr: 3.0e-5
+  warmup_steps: 200
+  max_steps: 12000        # ~3B tokens at 256k/step
+  weight_decay: 0.1
+  grad_clip: 1.0
+
+log:
+  eval_interval: 250
+  log_mfu: true
