@@ -26,6 +26,8 @@ def stream_source(spec: dict, limit: int | None = None) -> Iterator[Document]:
     Uses `datasets` in streaming mode so nothing is fully downloaded. Imported
     lazily so the offline `--sample` path needs neither the lib nor the network.
     """
+    import time
+
     from datasets import load_dataset
 
     name = spec["name"]
@@ -35,23 +37,37 @@ def stream_source(spec: dict, limit: int | None = None) -> Iterator[Document]:
     if limit is not None:
         max_docs = min(max_docs, limit) if max_docs else limit
 
-    ds = load_dataset(
-        spec["hf_path"],
-        spec.get("hf_config"),
-        data_dir=spec.get("data_dir"),
-        split=spec.get("split", "train"),
-        streaming=True,
-    )
+    def _open(skip: int):
+        ds = load_dataset(
+            spec["hf_path"],
+            spec.get("hf_config"),
+            data_dir=spec.get("data_dir"),
+            split=spec.get("split", "train"),
+            streaming=True,
+        )
+        return ds.skip(skip) if skip else ds
 
-    n = 0
-    for row in ds:
-        text = row.get(text_key)
-        if not text:
-            continue
-        yield Document(text=text, source=name, kind=kind, meta={"idx": n})
-        n += 1
-        if max_docs and n >= max_docs:
-            break
+    # Resilient streaming: on a transient error (e.g. HF rate-limit 429), reopen
+    # the stream and skip past what we already yielded, so a long build survives.
+    n, attempts = 0, 0
+    while True:
+        try:
+            for row in _open(n):
+                text = row.get(text_key)
+                if not text:
+                    continue
+                yield Document(text=text, source=name, kind=kind, meta={"idx": n})
+                n += 1
+                if max_docs and n >= max_docs:
+                    return
+            return  # stream exhausted cleanly
+        except Exception as e:  # noqa: BLE001 - want to survive any transient stream error
+            attempts += 1
+            if attempts > 6:
+                print(f"[warn] source {name}: giving up after {n} docs ({type(e).__name__}: {str(e)[:80]})")
+                return
+            print(f"[warn] source {name}: error at doc {n}, retry {attempts} ({type(e).__name__})")
+            time.sleep(5 * attempts)
 
 
 def stream_mixture(config: dict, limit_per_source: int | None = None) -> Iterator[Document]:
