@@ -33,14 +33,18 @@ class RLPrompt:
 
 
 # ---------------- synthetic arithmetic (offline, verifiable) ----------------
-def arithmetic_examples(n: int, seed: int = 0, max_val: int = 50):
-    """Yield n addition/multiplication problems with chain-of-thought + gold answer."""
+def arithmetic_examples(n: int, seed: int = 0, max_val: int = 99, ops=("+",)):
+    """Yield n arithmetic problems with chain-of-thought + gold answer.
+
+    Defaults to addition only with 2-digit operands: hard enough that a small BPE
+    model is partially correct after SFT (so GRPO has a reward signal to climb),
+    but tractable (unlike multiplication, which is hopeless at this scale)."""
     rng = random.Random(seed)
     out = []
     for _ in range(n):
         a, b = rng.randint(2, max_val), rng.randint(2, max_val)
-        op = rng.choice(["+", "*"])
-        ans = a + b if op == "+" else a * b
+        op = rng.choice(list(ops))
+        ans = a + b if op == "+" else (a - b if op == "-" else a * b)
         q = f"What is {a} {op} {b}?"
         cot = f"We compute {a} {op} {b} = {ans}."
         out.append((q, cot, str(ans)))
