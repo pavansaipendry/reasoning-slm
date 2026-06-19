@@ -50,11 +50,11 @@ def build_attention(config):
                 "(place it next to this repo or set REASONING_SLM_SIBLINGS). "
                 "Use attention='gated' or 'vanilla' otherwise."
             ) from e
+        # NSAConfig derives head_dim = dim // n_heads itself (it's a property, not an arg).
         ncfg = NSAConfig(
             dim=config.n_embd,
             n_heads=config.n_head,
             n_kv_heads=max(1, config.n_head // 4),
-            head_dim=config.n_embd // config.n_head,
             bias=config.bias,
         )
         return NSAttention(ncfg)
