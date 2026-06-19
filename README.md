@@ -1,70 +1,110 @@
 # reasoning-slm
 
-A math/code **reasoning small language model, trained end-to-end on a stack I built myself** —
-from raw web text to a served reasoning API.
+A **math-reasoning small language model, trained end-to-end on a stack I built myself** —
+from raw web text, through pretraining with custom gated attention, to RL post-training
+that teaches the model to reason.
 
-> Data pipeline → pretraining (with custom gated + NSA sparse attention) → SFT →
-> GRPO RL post-training → rigorous eval → served on a from-scratch inference engine.
+> Data pipeline → pretraining (custom **gated attention**) → SFT → **GRPO RL post-training
+> (implemented from scratch)** → verifiable-reward eval.
 
-This repo is the capstone that ties together three earlier projects:
+The headline: starting from a model pretrained from scratch, **GRPO RL lifts accuracy on a
+verifiable arithmetic-reasoning task from 35.7% (after SFT) to 91.0%** — the DeepSeek-R1-zero
+/ TinyZero "RL learns to reason" curve, reproduced on a model *and* a GRPO implementation
+written from scratch, on a single A100.
 
-| Piece | Where it comes from |
-|-------|--------------------|
-| **Gated attention** block | [`../gated-attention`](../gated-attention) — NeurIPS 2025 repro (+2.12% / attention-sink-free) |
-| **NSA sparse attention** block | [`../nsa-mini`](../nsa-mini) — Triton impl of DeepSeek Native Sparse Attention |
-| **Serving engine** | [`../mini-vllm`](../mini-vllm) — PagedAttention + continuous batching + custom Triton kernel |
+## Results
+
+118M-param model, addition reasoning task, **300 held-out problems, greedy decoding**:
+
+| Stage | Accuracy | Format rate |
+|-------|----------|-------------|
+| Base (pretrained only) | 0.0% | 0% |
+| + SFT | 35.7% | 99% |
+| **+ GRPO** | **91.0%** | 100% |
+
+Other measured numbers:
+
+| Metric | Value |
+|--------|-------|
+| Corpus | 841M tokens, 431k docs (from 500k streamed, filtered + MinHash-deduped) |
+| Pretrain | 118M params, gated attention, val loss 10.5 → **4.40** (3,200 steps) |
+| Throughput | ~145k tokens/sec, ~33% MFU on a single A100 80GB |
+
+GRPO training curve (reward → ~1.0, KL stays bounded) is in [`artifacts/grpo_add.log`](artifacts/);
+the pretrain curve is in [`artifacts/pretrain_base.log`](artifacts/).
 
 ## The honest framing
 
-On a **single A100 for a few hours** (~$25–40 total), a from-scratch ~100M model will *not*
-post state-of-the-art benchmark numbers — and any small-model repo that claims it does is
-leaking test data. So the artifact here is not a number. It is a **complete, reproducible,
-fully-owned pipeline that demonstrably improves the model at every stage** — base → SFT → RL —
-on a *verifiable* domain (math/code, where answers are checkable). The headline results are
-**relative lift** and a **real GRPO learning curve**, reported honestly, including failures.
+This is a **118M-param model trained for ~1 epoch on ~841M tokens** — it is a demonstration
+of the *full method and infrastructure*, not a generally capable model. The point is a
+**complete, reproducible, fully-owned pipeline that measurably improves the model at every
+stage** (base → SFT → RL) on a domain where answers are **verifiable**, so the reward signal
+is real rather than a learned reward model. Numbers are reported on held-out problems.
 
-## The three acts
+A real finding from the work: with standard BPE, multi-digit numbers fuse into opaque tokens
+and the model can't even copy the operands — so arithmetic is rendered **digit-by-digit**,
+which lifts SFT accuracy from ~5% to 35.7% before RL.
 
-### Act I — Data + Pretrain  (`data/`, `model/`, `pretrain/`)
-- Curate a math/code-heavy corpus (OpenWebMath + The Stack + a little FineWeb-Edu)
-- Quality-filter (Gopher-style heuristics) → **MinHash near-dedup** → **train a 32k BPE tokenizer**
-- Pretrain a ~100M decoder using the **gated + NSA** attention blocks; log val-loss, **MFU**, tokens/sec
+## What's built vs. planned
 
-### Act II — Post-train  (`posttrain/`)
-- **SFT** on math/code chain-of-thought traces
-- **GRPO implemented from scratch** with **verifiable rewards** (numeric-answer check, code execute + unit test, format reward)
+| Stage | Status |
+|-------|--------|
+| Data pipeline (filter, MinHash dedup, BPE, packing) | ✅ done |
+| Pretraining (gated attention, MFU/throughput logging) | ✅ done |
+| SFT (prompt-masked CoT fine-tuning) | ✅ done |
+| GRPO from scratch (group-relative adv, PPO-clip, KL-to-ref) | ✅ done |
+| Verifiable rewards (numeric + format) | ✅ done |
+| Eval harness (accuracy + format on a verifiable task) | ✅ done |
+| NSA sparse-attention backend | ⏳ wired as an optional backend, not yet trained with |
+| Code-execution reward + a code task | ⏳ scaffolded (`eval/code_exec.py` stub) |
+| Real benchmarks (GSM8K / MMLU / HumanEval) | ⏳ harness ready; needs a larger model |
+| Serving on `mini-vllm` (OpenAI-compatible API) | ⏳ planned |
 
-### Act III — Eval + Serve  (`eval/`, `serve/`)
-- `lm-eval-harness` (GSM8K / MMLU-subset) + a custom code-execution harness; report base vs SFT vs RL
-- Serve on `mini-vllm` with an OpenAI-compatible endpoint + live tokens/sec demo
+## Architecture
 
-## Results (filled in as stages land)
-
-| Stage | GSM8K (val) | Countdown reward | HumanEval-subset | Notes |
-|-------|-------------|------------------|------------------|-------|
-| Base (pretrain) | — | — | — | |
-| + SFT | — | — | — | |
-| + GRPO | — | — | — | |
+- Decoder-only transformer, weight-tied embeddings, **selectable attention backend**
+  (`vanilla | gated | nsa`). The **gated-attention** block (a query-dependent sigmoid gate on
+  the attention output; NeurIPS 2025 "Gated Attention" repro) is **vendored in-repo** so this
+  project stands alone. The `nsa` backend optionally imports my
+  [nsa-mini](https://github.com/pavansaipendry) NSA implementation if present.
+- Training loop from scratch: AdamW, warmup + cosine schedule, gradient accumulation to
+  262k tokens/step, bf16 autocast, MFU + tokens/sec logging, val eval + checkpointing.
+- **GRPO from scratch**: for each prompt, sample a group of completions, score with a
+  verifiable reward, use the group-normalized reward as the advantage (no value network),
+  update with a PPO-clipped objective + KL penalty to a frozen reference policy.
 
 ## Quickstart
 
 ```bash
 pip install -r requirements.txt
 
-# Act I — build a tiny corpus offline (no network, no GPU) to verify the pipeline:
+# 1. Data — verify the whole pipeline offline (no network/GPU):
 python -m data.pipeline --sample --out data/build_sample
-
-# Act I — the real thing (streams from HuggingFace):
+# ...or build the real corpus (streams from HuggingFace):
 python -m data.pipeline --config configs/data.yaml --out data/build
+
+# 2. Pretrain (GPU):
+python -m pretrain.train --config configs/pretrain_100m.yaml --data-dir data/build \
+    --out checkpoints/base --max-steps 3200
+
+# 3. SFT on the verifiable reasoning task:
+python -m posttrain.sft --ckpt checkpoints/base/ckpt.pt --data-dir data/build \
+    --dataset arithmetic --out checkpoints/sft
+
+# 4. GRPO RL from the SFT checkpoint:
+python -m posttrain.grpo --ckpt checkpoints/sft/ckpt.pt --data-dir data/build \
+    --dataset arithmetic --out checkpoints/grpo
+
+# 5. Eval base vs SFT vs GRPO:
+python -m eval.eval_reasoning --ckpt checkpoints/grpo/ckpt.pt --data-dir data/build \
+    --dataset arithmetic --n 300 --greedy
 ```
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the stage-by-stage plan and current status.
+Tests (offline, no GPU): `python tests/test_pipeline.py`
 
-## Status
-- [x] Repo scaffold
-- [ ] **Act I — data pipeline**  ← in progress
-- [ ] Act I — pretrain
-- [ ] Act II — SFT
-- [ ] Act II — GRPO
-- [ ] Act III — eval
-- [ ] Act III — serve
+## Tests
+6 offline tests cover the quality filters, MinHash/LSH dedup, Jaccard estimation, the
+verifiable reward functions, and a full end-to-end run on the sample corpus.
+
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the stage-by-stage plan and [`RESUME.md`](RESUME.md)
+for a summary of results.
