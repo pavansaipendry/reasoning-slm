@@ -1,0 +1,43 @@
+{
+  "out_dir": "data/build_1b",
+  "sample": false,
+  "stats": {
+    "documents_in": 500000,
+    "filter": {
+      "kept": 459041,
+      "rejected": 40959,
+      "by_reason": {
+        "dup_lines_high": 9448,
+        "alpha_fraction_low": 17886,
+        "mean_word_len_high": 1254,
+        "symbol_ratio_high": 5548,
+        "too_short": 2706,
+        "too_long": 2606,
+        "mean_word_len_low": 409,
+        "code_alnum_low": 1102
+      }
+    },
+    "dedup": {
+      "method": "minhash-lsh",
+      "num_perm": 128,
+      "bands": 8,
+      "rows": 16,
+      "threshold": 0.8,
+      "seen": 459041,
+      "duplicates_removed": 28014,
+      "kept": 431027
+    }
+  },
+  "manifest": {
+    "dtype": "uint16",
+    "eot_id": 0,
+    "vocab_size": 32000,
+    "n_docs": 431027,
+    "train_tokens": 841431780,
+    "val_tokens": 471605,
+    "files": {
+      "train": "train.bin",
+      "val": "val.bin"
+    }
+  }
+}

@@ -13,6 +13,9 @@ zstandard>=0.22         # read/write compressed cleaned-corpus shards
 # --- training (Act I/II) ---
 torch>=2.2
 
+# --- plotting training curves (scripts/plot_curves.py) ---
+matplotlib>=3.7
+
 # --- post-training (Act II), optional until that stage ---
 # trl>=0.9              # reference GRPO; we implement our own in posttrain/grpo.py
 

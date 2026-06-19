@@ -1,0 +1,21 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # The offline test suite (filters, MinHash dedup, rewards, full sample
+      # pipeline) needs no torch and no GPU — just the data-pipeline deps.
+      - name: Install deps
+        run: pip install numpy tokenizers zstandard pyyaml regex tqdm
+      - name: Run offline tests
+        run: python tests/test_pipeline.py

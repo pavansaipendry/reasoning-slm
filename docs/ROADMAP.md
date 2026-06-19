@@ -1,36 +1,50 @@
 # Roadmap
 
-Budget assumption: **1× A100, a few hours total (~$25–40)**, cost-conscious.
-Domain: **math/code reasoning** (verifiable answers → real RL rewards).
+Domain: **math reasoning** on a *verifiable* task (answers are checkable → real RL rewards).
+Hardware: single A100 80GB (RunPod).
 
-## Act I — Data + Pretrain
-**Data pipeline** (`data/`) — *the long pole and the differentiator*
-- [x] Document model + source streaming (`sources.py`) with an offline `--sample` mode
+## Act I — Data + Pretrain ✅ DONE
+**Data pipeline** (`data/`)
+- [x] Source streaming (`sources.py`) with an offline `--sample` mode
 - [x] Gopher-style quality filters for prose + code (`filters.py`)
-- [x] MinHash LSH near-dedup, plus an exact-hash fast path (`dedup.py`)
-- [x] Train a 32k byte-level BPE tokenizer (`tokenizer.py`)
+- [x] MinHash + LSH near-dedup, hand-rolled in NumPy (`dedup.py`)
+- [x] 32k byte-level BPE tokenizer (`tokenizer.py`)
 - [x] Tokenize + pack into memmap `.bin` shards with a manifest (`pack.py`)
-- [x] One CLI to run it all + stats reporting (`pipeline.py`)
-- [ ] Run the real mixture on RunPod, inspect stats, freeze a corpus
+- [x] One CLI + JSON stats report (`pipeline.py`)
+- [x] Built real corpus: **841M tokens, 431k docs** (open-web-math + codeparrot-clean + fineweb-edu)
 
 **Pretrain** (`model/`, `pretrain/`)
-- [ ] ~100M decoder; attention backend switch: `vanilla | gated | nsa`
-- [ ] Wire in `../gated-attention` and `../nsa-mini` blocks
-- [ ] Training loop with MFU + tokens/sec logging; target a val-loss curve
-- [ ] Mini scaling sweep (2–3 widths) for the README
+- [x] 118M decoder; attention backend switch (`vanilla | gated | nsa`)
+- [x] Gated-attention block **vendored in-repo**
+- [x] Training loop with MFU + tokens/sec logging
+- [x] Trained base: val loss 10.5 → **4.40**, ~33% MFU
 
-## Act II — Post-train
-- [ ] SFT on math/code CoT (GSM8K train, MetaMathQA, OpenMathInstruct)
-- [ ] **GRPO from scratch** (`posttrain/grpo.py`) — group-relative advantages, KL to ref
-- [ ] Verifiable rewards (`posttrain/rewards.py`): numeric check, code exec + unit test, format
-- [ ] Parallel track: GRPO on Qwen2.5-0.5B for a demo that pops
+## Act II — Post-train ✅ DONE (math/arithmetic)
+- [x] SFT (prompt-masked CoT) — `posttrain/sft.py`
+- [x] **GRPO from scratch** (group-relative adv, PPO-clip, KL-to-ref) — `posttrain/grpo.py`
+- [x] Verifiable rewards: numeric + format — `posttrain/rewards.py`
+- [x] Result: SFT 35.7% → **GRPO 91.0%** accuracy (held-out, +55 pts)
+- [ ] Code-execution reward (`eval/code_exec.py`) — implemented, not yet used in a run
 
 ## Act III — Eval + Serve
-- [ ] `lm-eval-harness` configs (GSM8K, MMLU-subset) + custom code-exec eval
-- [ ] base vs SFT vs RL table, with failure cases
-- [ ] Serve on `../mini-vllm`, OpenAI-compatible endpoint, tokens/sec demo
+- [x] Reasoning eval harness (accuracy + format) — `eval/eval_reasoning.py`
+- [x] base vs SFT vs GRPO table
+- [ ] Serve on `../mini-vllm` / simple inference API + demo
 
-## Compute napkin math
-- Pretrain: 100M params × ~3B tokens × 6 FLOPs ≈ 1.8e18 FLOPs.
-  A100 @ ~50% MFU (≈150 TFLOP/s effective) → ~3.3 h → ~$6.
-- SFT: <1 h. GRPO: 2–4 h (rollouts dominate). Total ≈ $25–40.
+## "Best results" — remaining work
+**No GPU (polish):**
+- [x] Accurate README + ROADMAP
+- [ ] `eval/code_exec.py` sandboxed scorer
+- [ ] `scripts/chat.py` interactive demo
+- [ ] LICENSE, CI (run tests), results plot from logs
+
+**GPU session (one start/stop, ~$10–15):**
+- [ ] Harder reasoning task: mixed ops + larger numbers; attempt **Countdown** (TinyZero-style)
+- [ ] Bigger/longer base for a more capable model
+- [ ] Train an **NSA** run; **gated vs vanilla vs NSA** ablation (val loss)
+- [ ] Serving demo (API + tokens/sec)
+- [ ] Final eval table on the upgraded task
+
+## Compute notes (measured)
+- Pretrain 118M × 841M tokens (3,200 steps) ≈ 1.6 h, ~$2, ~33% MFU, ~145k tok/s.
+- SFT: minutes. GRPO: ~25–35 min for 200 steps (rollouts dominate).
