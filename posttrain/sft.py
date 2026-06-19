@@ -47,8 +47,8 @@ def collate(batch, pad_id):
 
 
 def build_dataset(name, n):
-    if name == "arithmetic":
-        return ptdata.arithmetic_sft(n)
+    if name in ptdata.ARITHMETIC_TASKS:
+        return ptdata.arithmetic_sft(n, task=name)
     if name == "gsm8k":
         return ptdata.gsm8k_sft(n)
     raise ValueError(f"unknown dataset {name!r}")
@@ -58,7 +58,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True, help="base (pretrained) checkpoint")
     ap.add_argument("--data-dir", required=True, help="dir with tokenizer.json")
-    ap.add_argument("--dataset", default="gsm8k", choices=["gsm8k", "arithmetic"])
+    ap.add_argument("--dataset", default="gsm8k", choices=["gsm8k", "arithmetic", "arithmetic_hard"])
     ap.add_argument("--n", type=int, default=8000)
     ap.add_argument("--epochs", type=int, default=2)
     ap.add_argument("--batch", type=int, default=16)

@@ -24,8 +24,8 @@ from posttrain.rewards import extract_answer, numeric_reward, format_reward
 
 
 def build_prompts(name, n, split):
-    if name == "arithmetic":
-        return ptdata.arithmetic_rl(n, seed=12345)        # different seed than training
+    if name in ptdata.ARITHMETIC_TASKS:
+        return ptdata.arithmetic_rl(n, seed=12345, task=name)   # different seed than training
     if name == "gsm8k":
         return ptdata.gsm8k_rl(n, split=split)
     raise ValueError(name)
@@ -35,7 +35,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--data-dir", required=True)
-    ap.add_argument("--dataset", default="arithmetic", choices=["arithmetic", "gsm8k"])
+    ap.add_argument("--dataset", default="arithmetic", choices=["arithmetic", "arithmetic_hard", "gsm8k"])
     ap.add_argument("--n", type=int, default=200)
     ap.add_argument("--split", default="test")
     ap.add_argument("--max-new-tokens", type=int, default=64)

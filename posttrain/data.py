@@ -52,6 +52,8 @@ def arithmetic_examples(n: int, seed: int = 0, max_val: int = 99, ops=("+",)):
     for _ in range(n):
         a, b = rng.randint(2, max_val), rng.randint(2, max_val)
         op = rng.choice(list(ops))
+        if op == "-" and a < b:
+            a, b = b, a                      # keep subtraction non-negative
         ans = a + b if op == "+" else (a - b if op == "-" else a * b)
         sa, sb, sans = _spaced(a), _spaced(b), _spaced(ans)
         q = f"What is {sa} {op} {sb}?"
@@ -60,13 +62,23 @@ def arithmetic_examples(n: int, seed: int = 0, max_val: int = 99, ops=("+",)):
     return out
 
 
-def arithmetic_sft(n: int, seed: int = 0):
+# task presets: name -> (max_val, ops)
+ARITHMETIC_TASKS = {
+    "arithmetic": (99, ("+",)),                 # 2-digit addition
+    "arithmetic_hard": (999, ("+", "-")),       # 3-digit addition AND subtraction
+}
+
+
+def arithmetic_sft(n: int, seed: int = 0, task: str = "arithmetic"):
+    mv, ops = ARITHMETIC_TASKS[task]
     return [SFTExample(build_prompt(q), build_target(cot, target))
-            for q, cot, target, _ in arithmetic_examples(n, seed)]
+            for q, cot, target, _ in arithmetic_examples(n, seed, max_val=mv, ops=ops)]
 
 
-def arithmetic_rl(n: int, seed: int = 0):
-    return [RLPrompt(build_prompt(q), gold) for q, _, _, gold in arithmetic_examples(n, seed)]
+def arithmetic_rl(n: int, seed: int = 0, task: str = "arithmetic"):
+    mv, ops = ARITHMETIC_TASKS[task]
+    return [RLPrompt(build_prompt(q), gold)
+            for q, _, _, gold in arithmetic_examples(n, seed, max_val=mv, ops=ops)]
 
 
 # ---------------- GSM8K (real) ----------------

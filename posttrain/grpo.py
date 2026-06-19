@@ -42,8 +42,8 @@ def first_eot_end(ids, prompt_len, eot_id):
 
 
 def build_dataset(name, n):
-    if name == "arithmetic":
-        return ptdata.arithmetic_rl(n)
+    if name in ptdata.ARITHMETIC_TASKS:
+        return ptdata.arithmetic_rl(n, task=name)
     if name == "gsm8k":
         return ptdata.gsm8k_rl(n)
     raise ValueError(f"unknown dataset {name!r}")
@@ -53,7 +53,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True, help="policy init (SFT or base) checkpoint")
     ap.add_argument("--data-dir", required=True)
-    ap.add_argument("--dataset", default="arithmetic", choices=["arithmetic", "gsm8k"])
+    ap.add_argument("--dataset", default="arithmetic", choices=["arithmetic", "arithmetic_hard", "gsm8k"])
     ap.add_argument("--n-prompts", type=int, default=2000)
     ap.add_argument("--group-size", type=int, default=8)
     ap.add_argument("--prompts-per-step", type=int, default=8)
