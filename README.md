@@ -33,6 +33,21 @@ Other measured numbers:
 GRPO training curve (reward → ~1.0, KL stays bounded) is in [`artifacts/grpo_add.log`](artifacts/);
 the pretrain curve is in [`artifacts/pretrain_base.log`](artifacts/).
 
+### Attention ablation
+
+Same config (118M, 800 steps, identical data) — swapping *only* the attention block:
+
+| Backend | Val loss | Notes |
+|---------|----------|-------|
+| vanilla | 6.0037 | baseline |
+| **gated** | **5.9477** | best — the gated-attention benefit, reproduced in-repo |
+| NSA | n/a | ~85× slower at 2k context (sparse-attention overhead only pays off at long context) — see below |
+
+### Serving
+
+`serve/serve.py` loads a checkpoint and serves an OpenAI-compatible `/v1/chat/completions`
+endpoint (and a `/generate` route) — measured **~60–214 tokens/sec** on a single A100.
+
 ## The honest framing
 
 This is a **118M-param model trained for ~1 epoch on ~841M tokens** — it is a demonstration
@@ -41,9 +56,15 @@ of the *full method and infrastructure*, not a generally capable model. The poin
 stage** (base → SFT → RL) on a domain where answers are **verifiable**, so the reward signal
 is real rather than a learned reward model. Numbers are reported on held-out problems.
 
-A real finding from the work: with standard BPE, multi-digit numbers fuse into opaque tokens
-and the model can't even copy the operands — so arithmetic is rendered **digit-by-digit**,
-which lifts SFT accuracy from ~5% to 35.7% before RL.
+Two real findings from the work:
+- **BPE blocks arithmetic.** With standard BPE, multi-digit numbers fuse into opaque tokens
+  and the model can't even copy the operands — so numbers are rendered **digit-by-digit**,
+  which lifts SFT accuracy from ~5% to 35.7% before RL.
+- **GRPO needs a non-sparse base (the RL cold-start problem).** On a harder 3-digit
+  addition/subtraction task, SFT only reached ~8% (carries/borrows exceed a 118M model's
+  capacity), so almost no rollout earned a reward and GRPO **could not bootstrap** (stayed
+  ~5%). GRPO works only when the SFT base already gets enough answers right to create reward
+  variance — a concrete instance of why DeepSeek-R1 needed an SFT "cold-start" stage.
 
 ## What's built vs. planned
 
@@ -55,10 +76,12 @@ which lifts SFT accuracy from ~5% to 35.7% before RL.
 | GRPO from scratch (group-relative adv, PPO-clip, KL-to-ref) | ✅ done |
 | Verifiable rewards (numeric + format) | ✅ done |
 | Eval harness (accuracy + format on a verifiable task) | ✅ done |
-| NSA sparse-attention backend | ⏳ wired as an optional backend, not yet trained with |
-| Code-execution reward + a code task | ⏳ scaffolded (`eval/code_exec.py` stub) |
+| Attention ablation (vanilla / gated / NSA) | ✅ done — gated wins (5.95 < 6.00) |
+| Serving (OpenAI-compatible inference API) | ✅ done (`serve/serve.py`) |
+| NSA sparse-attention backend | ✅ runs, but impractical at 2k context (long-context only) |
+| Code-execution reward (`eval/code_exec.py`) | ✅ implemented; ⏳ not yet used in a training run |
 | Real benchmarks (GSM8K / MMLU / HumanEval) | ⏳ harness ready; needs a larger model |
-| Serving on `mini-vllm` (OpenAI-compatible API) | ⏳ planned |
+| High-throughput serving on `mini-vllm` | ⏳ planned (the demo server above is the current path) |
 
 ## Architecture
 
